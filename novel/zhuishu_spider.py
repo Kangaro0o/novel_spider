@@ -1,10 +1,12 @@
 # !/usr/bin/python
 # -*- coding: UTF-8 -*-
 
-from common.novel_spider import NovelSpider
-from urllib.parse import urlencode
-from config.urls import ZhuiShu_Index, ZhuiShu_Search, ZhuiShu_Headers
+from novel.novel_spider import NovelSpider
+from urllib.parse import urlparse, parse_qsl
+from config.sites import ZHUISHU, ZHUISHU_SEARCH, ZHUISHU_HEADERS
 import requests
+from requests.exceptions import ConnectionError, Timeout
+from requests.adapters import HTTPAdapter
 from pyquery import PyQuery as pq
 
 
@@ -12,50 +14,91 @@ class ZhuiShuSpider(NovelSpider):
     """
     追书网小说爬虫实现
     """
+
     def __init__(self):
         super(ZhuiShuSpider, self).__init__()
-        self._site_url = ZhuiShu_Index
-        self._search_url = ZhuiShu_Search
-        self._headers = ZhuiShu_Headers
+        self._site_url = ZHUISHU  # 追书网首页
+        self._search_url = ZHUISHU_SEARCH  # 追书网搜索URL
+        self._headers = ZHUISHU_HEADERS  # 头信息
+        # 初始化请求对象
+        self._s = requests.Session()
+        self._s.mount('https://', HTTPAdapter(max_retries=5))
+        self._s.mount('http://', HTTPAdapter(max_retries=5))
 
-    def search_page(self, keyword):
+    def __del__(self):
+        self._s.close()
+
+    def get_search_html(self, keyword, page=1):
+        """获取搜索页的源码"""
         params = {
-            'keyword': keyword
+            'keyword': keyword,
+            'page': page
         }
-        url = self._search_url + urlencode(params)
         try:
-            response = requests.get(url, headers=self._headers)
+            response = self._s.get(self._search_url, params=params, headers=self._headers)
             if response.status_code == 200:
                 return response.text
             return None
-        except requests.ConnectionError:
-            print('Failed to request', url)
-            pass
+        except ConnectionError as e:
+            print("A Connection error occurred.",e.args)
+        except Timeout as e:
+            print("The request timed out.", e.args)
 
-    def parse_search_page(self, search_html):
+    def __get_search_pages(self, search_html):
+        """计算出搜素结果的页数"""
+        max_page = '1'  # 默认最大页为1
         doc = pq(search_html)
-        selector = 'div.result-game-item-detail > h3 > a'
-        results = doc.find(selector)
-        if results:
-            for result in results.items():
-                yield {
-                    'title': result.text(),
-                    'chapters_url': result.attr('href')
-                }
-        else:
-            print('找不到')
+        # 获取分页容器对象
+        search_result_page = doc.find('.search-result-page-main')
+        # 判断是否存在分页：子节点中存在a标签则认为有分页
+        is_paginated = search_result_page.children().is_('a')
+        if is_paginated:
+            last_page_url = search_result_page.find(
+                'a:last-child').attr('href')
+            # url 解码
+            last_url = urlparse(last_page_url)
+            params = dict(parse_qsl(last_url.query))
+            max_page = params['page']
+        return max_page
 
-    def get_chapters_page(self, chapters_url):
+    def get_search_results(self, keyword):
+        """查询结果如果分页，现阶段只能解析一页"""
+        page = 0
+        max_page = 1
+        results = []  # 存储搜素结果的图书链接
+        while page < max_page:
+            page += 1  # 当前页
+            print('正在访问第', page, '页 ')
+            search_html = self.get_search_html(keyword, page)  # 第 page 页的源码
+            if search_html:
+                max_page = int(self.__get_search_pages(search_html))  # 最大页数
+                doc = pq(search_html)
+                selector = 'div.result-game-item-detail > h3 > a'
+                books = doc.find(selector)
+                if books:
+                    for book in books.items():
+                        results.append({
+                            'title': book.text(),
+                            'chapters_url': book.attr('href')
+                        })
+            else:
+                print("第", page, "页无法访问")
+        return results if len(results) > 0 else None
+
+    def get_chapters_html(self, chapters_url):
+        """获取小说目录页的源码"""
         try:
-            response = requests.get(chapters_url, headers=self._headers)
+            response = self._s.get(chapters_url, headers=self._headers)
             if response.status_code == 200:
                 return response.content.decode('utf-8')
             return None
-        except requests.ConnectionError:
-            print('Failed to request', chapters_url)
-            pass
+        except ConnectionError as e:
+            print("A Connection error occurred.", e.args)
+        except Timeout as e:
+            print("The request timed out.", e.args)
 
-    def parse_novel_info(self, chapters_html):
+    def get_novel_info(self, chapters_html):
+        """获取小说基本信息（作者、简介等）"""
         doc = pq(chapters_html)
         main_info = doc.find('.box_con #maininfo')
         img = doc.find('#fmimg img')
@@ -73,7 +116,7 @@ class ZhuiShuSpider(NovelSpider):
         }
         return info
 
-    def parse_chapters_page(self, chapters_html):
+    def get_chapters(self, chapters_html):
         doc = pq(chapters_html)
         chapters = doc.find('.box_con > #list > dl > dd > a')
         for chapter in chapters.items():
@@ -82,17 +125,18 @@ class ZhuiShuSpider(NovelSpider):
                 'url': self._site_url + chapter.attr('href')
             }
 
-    def get_chapter_page(self, chapter_url):
+    def get_chapter_html(self, chapter_url):
         try:
-            response = requests.get(chapter_url, headers=self._headers)
+            response = self._s.get(chapter_url, headers=self._headers)
             if response.status_code == 200:
                 return response.content.decode('utf-8')
             return None
-        except requests.ConnectionError:
-            print('Failed to request', chapter_url)
-            pass
+        except ConnectionError as e:
+            print("A Connection error occurred.", e.args)
+        except Timeout as e:
+            print("The request timed out.", e.args)
 
-    def parse_chapter_page(self, chapter_html):
+    def get_chapter_content(self, chapter_html):
         doc = pq(chapter_html)
         content = doc.find('#content')
         return content.text()

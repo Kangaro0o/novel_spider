@@ -1,9 +1,9 @@
 # !/usr/bin/python
 # -*- coding: UTF-8 -*-
 
-from common.database import Database
+from db.database import Database
 from pymongo import MongoClient
-from config.db import Mongo_Host, Mongo_Port, Mongo_DB
+from config.dbs import MONGO_HOST, MONGO_PORT, MONGO_DB
 
 
 class MongoDB(Database):
@@ -16,10 +16,10 @@ class MongoDB(Database):
         :param collection_name: 保存到哪个集合
         """
         super(MongoDB, self).__init__()
-        self._host = Mongo_Host
-        self._port = Mongo_Port
+        self._host = MONGO_HOST
+        self._port = MONGO_PORT
         self._client = MongoClient(host=self._host, port=self._port)
-        self._db = self._client[Mongo_DB]
+        self._db = self._client[MONGO_DB]
         self._collection = self._db[collection_name]
 
     def __del__(self):

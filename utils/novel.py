@@ -3,6 +3,7 @@
 from bson.objectid import ObjectId
 import time
 
+
 class Novel:
     """
     集成多个小说站点爬虫
@@ -12,32 +13,46 @@ class Novel:
         self._spider = novel_spider
         self._db = database
 
-    def search(self, keyword):
-        # 搜索关键字
-        search_page = self._spider.search_page(keyword)
-        # 解析搜索结果
-        results = self._spider.parse_search_page(search_page)
-        for result in results:
-            print('正在爬', result['title'])
-            # 获取目录页源码
-            chapters_html = self._spider.get_chapters_page(result['chapters_url'])
-            # 获取小说基本信息
-            book_info = self._spider.parse_novel_info(chapters_html)
-            # 把小说基本信息添加到数据库
-            _id = self._db.add(book_info)
-            book_chapters = self._spider.parse_chapters_page(chapters_html)
-            for chapter in book_chapters:
-                print('正在爬取', chapter['title'], chapter['url'])
-                chapter_html = self._spider.get_chapter_page(chapter['url'])
-                content = self._spider.parse_chapter_page(chapter_html)
-                self._db.append(ObjectId(_id), {
-                    'chapters': {
-                        'title': chapter['title'],
-                        'url': chapter['url'],
-                        'content': content
-                    },
-                })
-                print(chapter['title'], 'Saved Successfully')
-                time.sleep(1)
-            print(result['title'], 'finished!')
-        print('done!')
+    def fuzzy_search(self, keyword):
+        """模糊搜素小说，存储到数据库"""
+        results = self._spider.get_search_results(keyword)
+        if results:  # 如果查找到了相关小说
+            for result in results:
+                title = result['title']  # 小说名
+                print('正在爬取', title)
+                chapters_url = result['chapters_url']
+                # 获取目录页源码
+                chapters_html = self._spider.get_chapters_html(chapters_url)
+                if chapters_html:  # 如果请求到了小说目录页
+                    # 获取小说基本信息
+                    book_info = self._spider.get_novel_info(chapters_html)
+                    # 先把小说基本信息添加到数据库
+                    _id = self._db.add(book_info)
+                    # 接着遍历小说章节内容
+                    chapters = self._spider.get_chapters(chapters_html)
+                    for chapter in chapters:
+                        chapter_url = chapter['url']
+                        chapter_title = chapter['title']
+                        # 追加小说章节内容到数据库
+                        print('正在访问', chapter_title, chapter_url)
+                        chapter_html = self._spider.get_chapter_html(chapter_url)
+                        if chapter_html:  # 如果获取到了章节内容源码
+                            chapter_content = self._spider.get_chapter_content(chapter_html)
+                            # 追加存储到数据库
+                            self._db.append(ObjectId(_id), {
+                                'chapters': {
+                                    'title': chapter_title,
+                                    'url': chapter_url,
+                                    'content': chapter_content
+                                }
+                            })
+                            print(chapter_title, 'Saved Successfully')
+                        else:
+                            print(chapter_title, chapter_url, "无法爬取")
+                    print(title, 'has already finished!')
+                else:
+                    print(title, '无法爬取')
+            print('ALL DONE!')
+        else:
+            print("找不到和", keyword, '相关的小说')
+

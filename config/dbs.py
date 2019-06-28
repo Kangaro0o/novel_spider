@@ -5,8 +5,8 @@
 
 ##########################################
 ### MongoDB ###
-Mongo_Host = 'localhost'
-Mongo_User = ''
-Mongo_Password = ''
-Mongo_Port = 27017
-Mongo_DB = 'novel'
+MONGO_HOST = 'localhost'
+MONGO_USER = ''
+MONGO_PASSWORD = ''
+MONGO_PORT = 27017
+MONGO_DB = 'novel'
