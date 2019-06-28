@@ -26,4 +26,4 @@ mongodb = MongoDB('zhuishu')
 #     print(chapter)
 
 novel = Novel(zhuishu_spider, mongodb)
-novel.fuzzy_search('赞歌')
+novel.search('赞歌')
