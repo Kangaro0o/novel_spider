@@ -17,18 +17,18 @@ class BaBaDuShuSpider(NovelSpider):
 
     def __init__(self):
         super(BaBaDuShuSpider, self).__init__()
-        self._site_url = BABADUSHU  # 88读书网首页
-        self._search_url = BABADUSHU_SEARCH  # 88读书网搜素地址
-        self._headers = BABADUSHU_HEADERS  # 头信息
-        self._s = requests.Session()
-        self._s.mount('https://', HTTPAdapter(max_retries=MAX_RETRIES))
-        self._s.mount('http://', HTTPAdapter(max_retries=MAX_RETRIES))
+        self.__site_url = BABADUSHU  # 88读书网首页
+        self.__search_url = BABADUSHU_SEARCH  # 88读书网搜素地址
+        self.__headers = BABADUSHU_HEADERS  # 头信息
+        self.__s = requests.Session()
+        self.__s.mount('https://', HTTPAdapter(max_retries=MAX_RETRIES))
+        self.__s.mount('http://', HTTPAdapter(max_retries=MAX_RETRIES))
         # 记录当前小说目录链接
-        self._chapters_url = ''
+        self.__chapters_url = ''
 
     def __del__(self):
         """释放请求资源"""
-        self._s.close()
+        self.__s.close()
 
     def get_search_html(self, keyword, page=1):
         """
@@ -43,7 +43,7 @@ class BaBaDuShuSpider(NovelSpider):
             'page': page
         }
         try:
-            response = self._s.get(self._search_url, params=params, headers=self._headers)
+            response = self.__s.get(self.__search_url, params=params, headers=self.__headers)
             if response.status_code == 200:
                 return response.text
             return None
@@ -96,10 +96,10 @@ class BaBaDuShuSpider(NovelSpider):
         return results if len(results) > 0 else None
 
     def get_chapters_html(self, chapters_url):
-        self._chapters_url = chapters_url
+        self.__chapters_url = chapters_url
         """获取小说目录页的源码"""
         try:
-            response = self._s.get(chapters_url, headers=self._headers)
+            response = self.__s.get(chapters_url, headers=self.__headers)
             if response.status_code == 200:
                 return response.content.decode('gbk')
             return None
@@ -132,12 +132,12 @@ class BaBaDuShuSpider(NovelSpider):
         for chapter in chapters.items():
             yield {
                 'title': chapter.text(),
-                'url': self._chapters_url + chapter.attr('href')
+                'url': self.__chapters_url + chapter.attr('href')
             }
 
     def get_chapter_html(self, chapter_url):
         try:
-            response = self._s.get(chapter_url, headers=self._headers)
+            response = self.__s.get(chapter_url, headers=self.__headers)
             if response.status_code == 200:
                 return response.content
             return None

@@ -18,16 +18,16 @@ class ZhuiShuSpider(NovelSpider):
 
     def __init__(self):
         super(ZhuiShuSpider, self).__init__()
-        self._site_url = ZHUISHU  # 追书网首页
-        self._search_url = ZHUISHU_SEARCH  # 追书网搜索URL
-        self._headers = ZHUISHU_HEADERS  # 头信息
+        self.__site_url = ZHUISHU  # 追书网首页
+        self.__search_url = ZHUISHU_SEARCH  # 追书网搜索URL
+        self.__headers = ZHUISHU_HEADERS  # 头信息
         # 初始化请求对象
-        self._s = requests.Session()
-        self._s.mount('https://', HTTPAdapter(max_retries=MAX_RETRIES))
-        self._s.mount('http://', HTTPAdapter(max_retries=MAX_RETRIES))
+        self.__s = requests.Session()
+        self.__s.mount('https://', HTTPAdapter(max_retries=MAX_RETRIES))
+        self.__s.mount('http://', HTTPAdapter(max_retries=MAX_RETRIES))
 
     def __del__(self):
-        self._s.close()
+        self.__s.close()
 
     def get_search_html(self, keyword, page=1):
         """获取搜索页的源码"""
@@ -36,7 +36,7 @@ class ZhuiShuSpider(NovelSpider):
             'page': page
         }
         try:
-            response = self._s.get(self._search_url, params=params, headers=self._headers)
+            response = self.__s.get(self.__search_url, params=params, headers=self.__headers)
             if response.status_code == 200:
                 return response.text
             return None
@@ -63,7 +63,6 @@ class ZhuiShuSpider(NovelSpider):
         return max_page
 
     def get_search_result(self, search_html):
-        """传入搜素结果某一页的源码，然后解析"""
         """传入搜素结果某一页的源码，然后解析"""
         doc = pq(search_html)
         selector = 'div.result-game-item-detail > h3 > a'
@@ -99,7 +98,7 @@ class ZhuiShuSpider(NovelSpider):
     def get_chapters_html(self, chapters_url):
         """获取小说目录页的源码"""
         try:
-            response = self._s.get(chapters_url, headers=self._headers)
+            response = self.__s.get(chapters_url, headers=self.__headers)
             if response.status_code == 200:
                 return response.content.decode('utf-8')
             return None
@@ -133,12 +132,12 @@ class ZhuiShuSpider(NovelSpider):
         for chapter in chapters.items():
             yield {
                 'title': chapter.text(),
-                'url': self._site_url + chapter.attr('href')
+                'url': self.__site_url + chapter.attr('href')
             }
 
     def get_chapter_html(self, chapter_url):
         try:
-            response = self._s.get(chapter_url, headers=self._headers)
+            response = self.__s.get(chapter_url, headers=self.__headers)
             if response.status_code == 200:
                 return response.content.decode('utf-8')
             return None
