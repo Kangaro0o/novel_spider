@@ -1,38 +1,45 @@
 # !/usr/bin/python
 # -*- coding: UTF-8 -*-
-
 from novel.novel_spider import NovelSpider
-from urllib.parse import urlparse, parse_qsl
-from config.sites import ZHUISHU, ZHUISHU_SEARCH, ZHUISHU_HEADERS
+from config.sites import BABADUSHU, BABADUSHU_SEARCH, BABADUSHU_HEADERS
 import requests
 from requests.exceptions import ConnectionError, Timeout
 from requests.adapters import HTTPAdapter
-from pyquery import PyQuery as pq
 from config.settings import MAX_RETRIES
+from pyquery import PyQuery as pq
+from math import ceil
 
 
-class ZhuiShuSpider(NovelSpider):
+class BaBaDuShuSpider(NovelSpider):
     """
-    追书网小说爬虫实现
+    88读书小说网爬虫实现
     """
 
     def __init__(self):
-        super(ZhuiShuSpider, self).__init__()
-        self._site_url = ZHUISHU  # 追书网首页
-        self._search_url = ZHUISHU_SEARCH  # 追书网搜索URL
-        self._headers = ZHUISHU_HEADERS  # 头信息
-        # 初始化请求对象
+        super(BaBaDuShuSpider, self).__init__()
+        self._site_url = BABADUSHU  # 88读书网首页
+        self._search_url = BABADUSHU_SEARCH  # 88读书网搜素地址
+        self._headers = BABADUSHU_HEADERS  # 头信息
         self._s = requests.Session()
         self._s.mount('https://', HTTPAdapter(max_retries=MAX_RETRIES))
         self._s.mount('http://', HTTPAdapter(max_retries=MAX_RETRIES))
+        # 记录当前小说目录链接
+        self._chapters_url = ''
 
     def __del__(self):
+        """释放请求资源"""
         self._s.close()
 
     def get_search_html(self, keyword, page=1):
-        """获取搜索页的源码"""
+        """
+        根据关键字搜索图书
+        :param keyword: 搜索关键字
+        :param page: 当前页码
+        :return: 搜索返回的 源码
+        """
         params = {
-            'keyword': keyword,
+            'search_field': '0',
+            'q': keyword,
             'page': page
         }
         try:
@@ -47,32 +54,24 @@ class ZhuiShuSpider(NovelSpider):
 
     def __get_search_pages(self, search_html):
         """计算出搜素结果的页数"""
-        max_page = '1'  # 默认最大页为1
         doc = pq(search_html)
-        # 获取分页容器对象
-        search_result_page = doc.find('.search-result-page-main')
-        # 判断是否存在分页：子节点中存在a标签则认为有分页
-        is_paginated = search_result_page.children().is_('a')
-        if is_paginated:
-            last_page_url = search_result_page.find(
-                'a:last-child').attr('href')
-            # url 解码
-            last_url = urlparse(last_page_url)
-            params = dict(parse_qsl(last_url.query))
-            max_page = params['page']
-        return max_page
+        # 获取搜素结果总数
+        search_result_total = doc.find('.ops_lf')
+        total = int(search_result_total.find('em:last-child').text())
+        per_page = 10
+        max_page = ceil(total/per_page)
+        return 1 if max_page == 0 else max_page
 
     def get_search_result(self, search_html):
         """传入搜素结果某一页的源码，然后解析"""
-        """传入搜素结果某一页的源码，然后解析"""
         doc = pq(search_html)
-        selector = 'div.result-game-item-detail > h3 > a'
+        selector = '.ops_cover .block_txt p:first-child'
         books = doc.find(selector)
         if books:
             for book in books.items():
                 yield {
-                    'title': book.text(),
-                    'chapters_url': book.attr('href')
+                    'title': book.find('h2').text(),
+                    'chapters_url': book.find('a').attr('href')
                 }
 
     def get_search_results(self, keyword):
@@ -85,7 +84,7 @@ class ZhuiShuSpider(NovelSpider):
             print('正在访问第', page, '页 ')
             search_html = self.get_search_html(keyword, page)  # 第 page 页的源码
             if search_html:
-                max_page = int(self.__get_search_pages(search_html))  # 最大页数
+                max_page = self.__get_search_pages(search_html)  # 最大页数
                 result = self.get_search_result(search_html)
                 for r in result:
                     results.append({
@@ -97,11 +96,12 @@ class ZhuiShuSpider(NovelSpider):
         return results if len(results) > 0 else None
 
     def get_chapters_html(self, chapters_url):
+        self._chapters_url = chapters_url
         """获取小说目录页的源码"""
         try:
             response = self._s.get(chapters_url, headers=self._headers)
             if response.status_code == 200:
-                return response.content.decode('utf-8')
+                return response.content.decode('gbk')
             return None
         except ConnectionError as e:
             print("A Connection error occurred.", e.args)
@@ -111,36 +111,35 @@ class ZhuiShuSpider(NovelSpider):
     def get_novel_info(self, chapters_html):
         """获取小说基本信息（作者、简介等）"""
         doc = pq(chapters_html)
-        main_info = doc.find('.box_con #maininfo')
-        img = doc.find('#fmimg img')
-        title = main_info.find('#info h1')  # 书名
-        author = main_info.children('#info p').eq(0)
-        status = main_info.children('#info p').eq(1).remove('a')
-        intro = main_info.find('#intro')  # 简介
-        cover = img.attr('src')
+        main_info = doc.find('.jieshao')
+        cover = main_info.find('.lf img').attr('src')
+        title = main_info.find('.rt h1')  # 书名
+        author = main_info.find('.rt .msg em:first-child')
+        status = main_info.find('.rt .msg em:nth-child(2)')
+        intro = main_info.find('.rt .intro')  # 简介
         info = {
             'cover': cover,
             'title': title.text(),
-            'author': author.text()[7:],
-            'status': status.text()[7:-3],
+            'author': author.text()[3:],
+            'status': status.text()[3:],
             'intro': intro.text()
         }
         return info
 
     def get_chapters(self, chapters_html):
         doc = pq(chapters_html)
-        chapters = doc.find('.box_con > #list > dl > dd > a')
+        chapters = doc.find('.mulu ul li a')
         for chapter in chapters.items():
             yield {
                 'title': chapter.text(),
-                'url': self._site_url + chapter.attr('href')
+                'url': self._chapters_url + chapter.attr('href')
             }
 
     def get_chapter_html(self, chapter_url):
         try:
             response = self._s.get(chapter_url, headers=self._headers)
             if response.status_code == 200:
-                return response.content.decode('utf-8')
+                return response.content
             return None
         except ConnectionError as e:
             print("A Connection error occurred.", e.args)
@@ -149,5 +148,5 @@ class ZhuiShuSpider(NovelSpider):
 
     def get_chapter_content(self, chapter_html):
         doc = pq(chapter_html)
-        content = doc.find('#content')
+        content = doc.find('.novel .yd_text2')
         return content.text()

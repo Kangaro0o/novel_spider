@@ -45,9 +45,11 @@ class Novel:
                             }
                         })
                         print(chapter_title, 'Saved Successfully')
+                        time.sleep(1)
                     else:
                         print(chapter_title, chapter_url, "无法爬取")
                 print(title, 'has already finished!')
+                time.sleep(1)
             else:
                 print(title, '无法爬取')
         print('ALL DONE!')

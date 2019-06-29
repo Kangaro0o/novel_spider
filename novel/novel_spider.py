@@ -22,10 +22,18 @@ class NovelSpider:
         """
         pass
 
-    def get_search_results(self, search_html):
+    def __get_search_pages(self, search_html):
+        """计算搜素结果有多少页"""
+        pass
+
+    def get_search_result(self, search_html):
+        """传入搜素结果某一页的源码，然后解析"""
+        pass
+
+    def get_search_results(self, keyword):
         """
-        解析搜索页
-        :param search_html: 搜索后的源码
+        解析全部搜索结果
+        :param keyword: 搜素关键字
         :return: 搜索结果列表
         """
         pass
