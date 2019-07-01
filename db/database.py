@@ -26,6 +26,10 @@ class Database:
         """更新数据"""
         pass
 
-    def find(self, _id):
-        """查找数据"""
+    def find_by_id(self, _id):
+        """通过查找数据"""
+        pass
+
+    def find(self, **kwargs):
+        """多条件搜素"""
         pass

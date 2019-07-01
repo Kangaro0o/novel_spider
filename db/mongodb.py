@@ -30,7 +30,7 @@ class MongoDB(Database):
         print(data)
         return self.__collection.insert_one(data).inserted_id
 
-    def find(self, _id):
+    def find_by_id(self, _id):
         return self.__collection.find({'_id': _id})
 
     def update(self, _id, data):
@@ -38,3 +38,10 @@ class MongoDB(Database):
 
     def append(self, _id, data):
         self.__collection.update({'_id': _id}, {'$push': data})
+
+    def find(self, **kwargs):
+        """多条件搜素"""
+        conditions = {}
+        for key, value in kwargs.items():
+            conditions[key] = value
+        return self.__collection.find(conditions)

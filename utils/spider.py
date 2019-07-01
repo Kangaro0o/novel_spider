@@ -4,7 +4,7 @@ from bson.objectid import ObjectId
 import time
 
 
-class Novel:
+class Spider:
     """
     集成多个小说站点爬虫
     """

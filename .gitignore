@@ -104,3 +104,8 @@ venv.bak/
 .mypy_cache/
 
 .idea/
+
+storages/
+txt/
+epub/
+mobi/
