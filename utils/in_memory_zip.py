@@ -1,7 +1,7 @@
 # !/usr/bin/python
 # -*- coding: UTF-8 -*-
 import zipfile
-from io import StringIO
+from io import BytesIO
 from os import path
 
 
@@ -10,7 +10,7 @@ class InMemoryZip:
 
     def __init__(self):
         # 创建内存文件
-        self.__memory_zip = StringIO()
+        self.__memory_zip = BytesIO()
 
     def append(self, filename_in_zip, file_content):
         """

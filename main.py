@@ -1,5 +1,6 @@
 # !/usr/bin/python
 # -*- coding: UTF-8 -*-
+from utils.in_memory_zip import InMemoryZip
 from db.mongodb import MongoDB
 from convert.convert_to_epub import ConvertToEpub
 # from utils.spider import Spider
@@ -29,8 +30,51 @@ mongodb = MongoDB('liewen')
 #     content = file.read()
 #     print(content.format(title='狄仁杰', author='安娜方法', publisher='盗亦有道'))
 
-epub = ConvertToEpub("测试书")
+
 # opf生成
-opf = epub.set_opf(title='书名', author='作者', description='小说描述信息', date='2019-7-1', subject='灵异类',
-                   items='<item></item>', itemsref='<itemref></itemref>')
-print(opf)
+# cursor = mongodb.find(title='聊斋假太子')
+# book = cursor.next()
+# epub = ConvertToEpub(book['title'], book['author'],
+#                      book['cover'], book['intro'], book['chapters'])
+
+# opf = epub.set_opf()
+# print(opf)
+
+
+# 生成 mimetype
+# mimetype = epub.set_mimetype()
+
+# 生成container.xml
+# container = epub.set_container()
+
+# 生成 ncx
+"""
+<navPoint id="chapter15" playOrder="15">
+<navLabel><text>尾声</text></navLabel>
+<content src="chapter15.html"/>
+"""
+# ncx = epub.set_ncx(title='novel name', author='liuwen', nav_points='<biaiqoain:>')
+# print(ncx)
+
+# 生成封面
+# cover = epub.set_cover(title='novel name', author='kelvin', intro='this is intro')
+# print(cover)
+
+# from uuid import uuid4
+# print(uuid4())
+
+if __name__ == '__main__':
+    cursor = mongodb.find(title='聊斋假太子')
+    book = cursor.next()
+    epub = ConvertToEpub(book['title'], book['author'],
+                         book['cover'], book['intro'], book['chapters'])
+    # cover = epub.set_cover()
+    # print(cover)
+    # cnx = epub.set_ncx()
+    # print(cnx)
+
+    title = book['chapters'][0]['title']
+    content = book['chapters'][0]['content']
+
+    chapter = epub.set_chapter(title, content)
+    print(chapter)

@@ -16,9 +16,6 @@
 <!-- Content Documents -->
 <item id="main-css" href="css/main.css" media-type="text/css"/>
 <item id="coverpage"  href="coverpage.html"  media-type="application/xhtml+xml"/>
-<item id="chapter1"  href="chapter1.html"  media-type="application/xhtml+xml"/>
-<item id="chapter2"  href="chapter2.html"  media-type="application/xhtml+xml"/>
-<item id="chapter3"  href="chapter3.html"  media-type="application/xhtml+xml"/>
 {items}
 <item id="ncx"  href="TOC.ncx" media-type="application/x-dtbncx+xml"/>
 <item id="css" href="css/main.css" media-type="text/css"/>
@@ -26,13 +23,9 @@
 </manifest>
 <spine toc="ncx">
 <itemref idref="coverpage" linear="yes"/>
-<itemref idref="chapter1" linear="yes"/>
-<itemref idref="chapter2" linear="yes"/>
-<itemref idref="chapter3" linear="yes"/>
 {itemsref}
 </spine>
 <guide>
 <reference type="cover" title="封面"  href="coverpage.html"/>
-
 </guide>
 </package>
