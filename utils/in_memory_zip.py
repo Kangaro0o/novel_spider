@@ -19,7 +19,8 @@ class InMemoryZip:
         :param file_content: 文件内容
         :return:
         """
-        zf = zipfile.ZipFile(self.__memory_zip, 'a', zipfile.ZIP_DEFLATED, False)
+        zf = zipfile.ZipFile(self.__memory_zip, 'a',
+                             zipfile.ZIP_DEFLATED, False)
         zf.writestr(filename_in_zip, file_content)
         for zfile in zf.filelist:
             zfile.create_system = 0
@@ -34,10 +35,11 @@ class InMemoryZip:
         """
         if filename_in_zip is None:
             filename_in_zip = path.split(file_path)[1]
-        zf = zipfile.ZipFile(self.__memory_zip, 'a', zipfile.ZIP_DEFLATED, False)
-        zf.write(file_path, filename_in_zip)
-        for zfile in zf.filelist:
-            zfile.create_system = 0
+
+        f = open(file_path, 'rb')
+        file_contents = f.read()
+        self.append(filename_in_zip, file_contents)
+        f.close()
         return self
 
     def read(self):

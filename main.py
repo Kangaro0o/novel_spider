@@ -26,7 +26,7 @@ mongodb = MongoDB('liewen')
 # book = cursor.next()
 # print(book)
 
-# with open('./convert/epub2_templates/OPS/package.opf', encoding='utf-8', mode='r') as file:
+# with open('./convert/epub2_templates/OPS/fb.opf', encoding='utf-8', mode='r') as file:
 #     content = file.read()
 #     print(content.format(title='狄仁杰', author='安娜方法', publisher='盗亦有道'))
 
@@ -73,8 +73,10 @@ if __name__ == '__main__':
     # cnx = epub.set_ncx()
     # print(cnx)
 
-    title = book['chapters'][0]['title']
-    content = book['chapters'][0]['content']
+    # title = book['chapters'][0]['title']
+    # content = book['chapters'][0]['content']
 
-    chapter = epub.set_chapter(title, content)
-    print(chapter)
+    # chapter = epub.set_chapter(title, content)
+    # print(chapter)
+
+    epub.make()
