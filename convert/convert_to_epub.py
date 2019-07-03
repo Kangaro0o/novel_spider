@@ -5,16 +5,16 @@ from config.settings import EPUB_DIR, EPUB_SOURCE, EPUB_RIGHTS, EPUB_PUBLISHER, 
 import os
 from datetime import date
 from uuid import uuid4
-from utils.in_memory_zip import InMemoryZip
 import requests
 from requests.exceptions import ConnectionError, Timeout
+import zipfile
 
 
 class ConvertToEpub(Converter):
     """生成 epub 电子书"""
 
     # epub 模板路径
-    templates_path = './convert/epub2_templates/'
+    _templates_path = './convert/epub2_templates'
 
     def __init__(self, title, author, cover, intro, chapters):
         # 如果目录不存在，则创建一个
@@ -34,83 +34,56 @@ class ConvertToEpub(Converter):
         self.__cover = cover
         self.__intro = intro
         self.__chapters = chapters
-        # 模板文件句柄
-        self.__mimetype = open(self.templates_path + 'mimetype',
-                               encoding='utf-8', mode='r')
-        self.__container = open(self.templates_path + 'META-INF/container.xml',
-                                encoding='utf-8', mode='r')
-        self.__opf = open(self.templates_path + 'OPS/fb.opf',
-                          encoding='utf-8', mode='r')
-        self.__coverpage = open(self.templates_path + 'OPS/coverpage.html',
-                                encoding='utf-8', mode='r')
-        self.__ncx = open(self.templates_path + 'OPS/fb.ncx',
-                          encoding='utf-8', mode='r')
-        self.__chapter = open(self.templates_path + 'OPS/chapter_template.html',
-                              encoding='utf-8', mode='r')
-        # 内存中的 zip
-        self.__imz = InMemoryZip()
+        # 模板文件路径
+        self.__container = self._templates_path + '/META-INF/container.xml'
+        self.__opf = self._templates_path + '/OPS/fb.opf'
+        self.__cover_page = self._templates_path + '/OPS/coverpage.html'
+        self.__ncx = self._templates_path + '/OPS/fb.ncx'
+        self.__chapter = self._templates_path + '/OPS/chapter_template.html'
+        # zip 文件对象
+        self.__epub = zipfile.ZipFile(self.__dir + self.__title+'.epub', 'a', compression=zipfile.ZIP_DEFLATED)
 
     def __del__(self):
-        self.__mimetype.close()
-        self.__container.close()
-        self.__opf.close()
-        self.__coverpage.close()
-        self.__ncx.close()
-        self.__chapter.close()
+        self.__epub.close()
 
-    def __set_mimetype(self):
-        return self.__mimetype.read()
+    def write_mimetype(self):
+        self.__epub.writestr('mimetype', 'application/epub+zip', compress_type=zipfile.ZIP_STORED)
+        return self
 
-    def set_container(self):
-        return self.__container.read()
+    def write_container(self):
+        with open(self.__container, 'r', encoding='utf-8') as f:
+            self.__epub.writestr('META-INF/container.xml', f.read())
+        return self
 
-    def set_cover(self):
-        """小说封面"""
-        content = self.__coverpage.read()
-        return content.format(publisher=self.__publisher, builder=self.__builder,
-                              rights=self.__rights, title=self.__title, author=self.__author, intro=self.__intro)
-
-    def set_ncx(self):
-        # 生成 navPoint
-        nav_points = []
-        for i, chapter in enumerate(self.__chapters):
-            nav_points.append('''
-<navPoint id="chapter{id}" playOrder="{id}">
-<navLabel><text>{title}</text></navLabel>
-<content src="chapter{id}.html"/>
-</navPoint>'''.format(id=(i+1), title=chapter['title']))
-        nav_points = '\n'.join(nav_points)
-        content = self.__ncx.read()
-        uuid = uuid4()
-        return content.format(uuid4=uuid, provider=self.__provider, builder=self.__builder,
-                              rights=self.__rights, title=self.__title, author=self.__author, nav_points=nav_points)
-
-    def set_chapter(self, chapter_title, chapter_content):
-        """生成章节内容"""
-        content = self.__chapter.read()
-        return content.format(provider=self.__provider, builder=self.__builder, rights=self.__rights,
-                              title=chapter_title, content=chapter_content)
-
-    def set_opf(self, subject=None):
+    def write_opf(self, subject=None):
         """
         生成 fb.opf
-        利用 chapters(title,url,content)
         """
-        length = len(self.__chapters)
         items = []
-        itemsref = []
+        itemrefs = []
         # 生成 items itemsref
-        for i in range(1, length + 1):
-            items.append(
-                '<item id="chapter{id}"  href="chapter{id}.html"  media-type="application/xhtml+xml"/>'.format(id=i))
-            itemsref.append(
-                '<itemref idref="chapter{id}" linear="yes"/>'.format(id=i))
+        for i in range(1, len(self.__chapters) + 1):
+            items.append('<item id="chapter{id}"  href="chapter{id}.html"  '
+                         'media-type="application/xhtml+xml"/>'.format(id=i))
+            itemrefs.append('<itemref idref="chapter{id}" linear="yes"/>'.format(id=i))
         items = "\n".join(items)
-        itemsref = "\n".join(itemsref)
-        content = self.__opf.read()
+        itemrefs = "\n".join(itemrefs)
+
         today = date.today()
-        return content.format(publisher=self.__publisher, source=self.__source, rights=self.__rights, date=today, subject=subject,
-                              items=items, itemsref=itemsref, title=self.__title, author=self.__author, description=self.__intro)
+        with open(self.__opf, 'r', encoding='utf-8') as f:
+            content = f.read().format(publisher=self.__publisher, source=self.__source, rights=self.__rights,
+                                      date=today, subject=subject, items=items, itemsref=itemrefs,
+                                      title=self.__title, author=self.__author, description=self.__intro)
+            self.__epub.writestr('OPS/fb.opf', content)
+        return self
+
+    def write_cover_page(self):
+        """小说封面页"""
+        with open(self.__cover_page, 'r', encoding='utf-8') as f:
+            content = f.read().format(publisher=self.__publisher, builder=self.__builder, rights=self.__rights,
+                                      title=self.__title, author=self.__author, intro=self.__intro)
+            self.__epub.writestr('OPS/coverpage.html', content)
+        return self
 
     def get_image(self):
         try:
@@ -123,33 +96,44 @@ class ConvertToEpub(Converter):
         except Timeout as e:
             print('请求超时', e.args)
 
-    def make(self):
-        # 因为 mimetype 不需要修改，所以可以直接放到 zip
-        self.__imz.append_file(self.templates_path + 'mimetype')
-        # 同理，可以直接把 container.xml 放到zip
-        self.__imz.append_file(
-            self.templates_path + 'META-INF/container.xml', '/META-INF/container.xml')
-        # 同理，添加 css/main.css
-        self.__imz.append_file(self.templates_path + 'OPS/css/main.css', '/OPS/css/main.css')
-        # 获取package.opf
-        opf = self.set_opf()
-        # 把 fb.opf 放到 zip
-        self.__imz.append('/OPS/fb.opf', opf)
-        # 获取 fb.ncx
-        ncx = self.set_ncx()
-        # 把 fb.ncx 放到 zip
-        self.__imz.append('/OPS/fb.ncx', ncx)
-        # 获取封面
-        img = self.get_image()
-        # 把封面放到 zip (/OPS/images/cover.jpg)
-        self.__imz.append('/OPS/images/cover.jpg', img)
-        # 把 coverpage.html 放到 zip
-        coverpage = self.set_cover()
-        self.__imz.append('/OPS/coverpage.html', coverpage)
-        # 获取章节内容
+    def write_cover(self):
+        image = self.get_image()
+        self.__epub.writestr('OPS/images/cover.jpg', image)
+        return self
+
+    def write_ncx(self):
+        # 生成 navPoint
+        nav_points = []
         for i, chapter in enumerate(self.__chapters):
-            title = chapter['title']
-            content = chapter['content']
-            self.__imz.append(
-                '/OPS/chapter{id}.html'.format(id=(i+1)), self.set_chapter(title, content))
-        self.__imz.write_to_file(self.__title + '.epub')
+            nav_points.append('''
+<navPoint id="chapter{id}" playOrder="{id}">
+<navLabel><text>{title}</text></navLabel>
+<content src="chapter{id}.html"/>
+</navPoint>'''.format(id=(i+1), title=chapter['title']))
+        nav_points = '\n'.join(nav_points)
+        uuid = uuid4()
+        with open(self.__ncx, 'r', encoding='utf-8') as f:
+            content = f.read().format(uuid4=uuid, provider=self.__provider, builder=self.__builder,rights=self.__rights,
+                                      title=self.__title, author=self.__author, nav_points=nav_points)
+            self.__epub.writestr('OPS/fb.ncx', content)
+        return self
+
+    def write_chapters(self):
+        """生成章节内容"""
+        with open(self.__chapter, 'r', encoding='utf-8') as f:
+            content = f.read()
+        for i, chapter in enumerate(self.__chapters):
+            html = content.format(provider=self.__provider, builder=self.__builder, rights=self.__rights,
+                                  title=chapter['title'], content=chapter['content'])
+            self.__epub.writestr('OPS/chapter{}.html'.format(i+1), html)
+        return self
+
+    def make(self):
+        self.write_mimetype()
+        self.write_container()
+        self.write_opf()
+        self.write_ncx()
+        self.write_cover_page()
+        self.write_cover()
+        self.write_chapters()
+        print('epub 已生成')

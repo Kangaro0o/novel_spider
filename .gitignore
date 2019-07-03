@@ -106,6 +106,6 @@ venv.bak/
 .idea/
 
 storages/
-txt/
-epub/
-mobi/
+txts/
+epubs/
+mobis/
